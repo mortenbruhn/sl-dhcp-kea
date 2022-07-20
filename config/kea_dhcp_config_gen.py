@@ -9,10 +9,15 @@ import yaml
 indexes = range(1, 9)
 offsets = [1, 2, 3, 4, 5, 6, 7, 9]
 
+poolstart = 11
+
 std_incr = 10
 vrf_incr = std_incr
 ip_c_incr = std_incr
 vlan_incr = std_incr
+
+data_file_name = 'data.csv'
+full_config_name = 'full-config.yaml'
 
 vrf_descs_in_order = [
     'wireless-ap-mgmt',
@@ -115,6 +120,8 @@ def write_data_file(input_dict, outputfilename):
         writer = csv.DictWriter(csvfile, fieldnames=input_dict[0].keys())
         writer.writeheader()
         writer.writerows(input_dict)
+        csvfile.flush()
+        csvfile.close()
 
 
 def subnet(row):
@@ -124,13 +131,6 @@ def subnet(row):
     if row['description'].casefold() in ['wireless networks']:
         return
     ip = ipaddress.IPv4Network(row['prefix'])
-
-    poolstart = 11
-    # if ip.subnet_of(ipaddress.IPv4Network('10.255.0.0/16')) or \
-    #         ip.subnet_of(ipaddress.IPv4Network('172.20.0.0/16')):
-    #     poolstart = 100
-    # elif ip.subnet_of(ipaddress.IPv4Network('10.248.0.0/16')):
-    #     poolstart = 6
 
     if ip.prefixlen > 24:
         return
@@ -153,29 +153,16 @@ def subnet(row):
     }
 
 
-# predatafile = pathlib.Path(os.path.dirname(__file__), 'pre-data.csv')
-configfile = pathlib.Path(os.path.dirname(__file__), 'full-config.yaml')
-datafile = pathlib.Path(os.path.dirname(__file__), 'data.csv')
-# if predatafile.exists() and predatafile.is_file():
-# Pre-data file exists. Intention is to generate a data file.
-#    pre = predatafile.read_bytes()
-#    prereader = csv.DictReader(io.StringIO(pre.decode()), delimiter=',', quotechar='|')
-#    with open(datafile, 'wb+') as f:
-#        print('hest')
-# else:
-#    print('No pre-data.csv file found')
+configfile = pathlib.Path(os.path.dirname(__file__), full_config_name)
+datafile = pathlib.Path(os.path.dirname(__file__), data_file_name)
 if not configfile.exists() or not configfile.is_file():
     raise FileNotFoundError(configfile)
 else:
     config_dict = read_yaml_as_dict(configfile)
     post_config = map_pre_to_post_config(config_dict)
-    write_data_file(post_config, 'data.csv')
+    write_data_file(post_config, data_file_name)
 
 if not datafile.exists() or not datafile.is_file():
-    # netbox = 'https://netbox.minserver.dk/ipam/prefixes/?status=1&parent=&family=&q=&vrf=npflan&mask_length=&export'
-    # data = urllib.request.urlopen(netbox).read()
-    # with open(datafile, 'wb+') as f:
-    #     f.write(data)
     raise Exception('Expected a CSV file to be found at ' + datafile.name + '. No such file found.')
 else:
     data = datafile.read_bytes()
