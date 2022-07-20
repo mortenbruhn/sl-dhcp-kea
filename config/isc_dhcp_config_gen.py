@@ -7,8 +7,42 @@ import pathlib
 import yaml
 
 
+class ConfigRow():
+
+    def __init__(self, main_name, sec_name, ip_value, vlan_value):
+        self.main_name = main_name
+        self.sec_name = sec_name
+        self.ip_value = ip_value
+        self.vlan_value = vlan_value
+
+
+def read_yaml_as_dict(configfile):
+    with open(configfile, 'r') as c:
+        main_list = yaml.safe_load(c)
+        for main_item in main_list:
+            for main_key, main_value in main_item.items():
+                print('Generating config for main IS with key ' + main_key)
+                main_name = main_key
+                for second_item in main_value:
+                    for sec_key, sec_value in second_item.items():
+                        sec_name = sec_key
+                        ip_value = sec_value['ip']
+                        vlan_value = sec_value['vlan']
+                        print('main: ' + main_name + ' sec: ' + sec_name + ' ip: ' + ip_value + ' vlan: ' + str(
+                            vlan_value))
+                        yield ConfigRow(main_name, sec_name, ip_value, vlan_value)
+
+
+def map_pre_to_post_config(config_rows):
+    for input_row in config_rows:
+        # prefix, vrf, tenant, site, vlan_group, vlan, status, role, is_pool, description
+        # 10.0.0.0/30,NPFLAN,,npflan,npflan-core1,301,Active,Firewall Net,,AVATAR Inside
+        ipnet = ipaddress.ip_address(input_row.ip_value + "/24")
+
+
 def subnet(row):
-    if row['role'].casefold() not in ['access', 'wireless', 'management  netværk', 'management netværk', 'cctv','management access points', 'environment']:
+    if row['role'].casefold() not in ['access', 'wireless', 'management  netværk', 'management netværk', 'cctv',
+                                      'management access points', 'environment']:
         return
     if row['description'].casefold() in ['wireless networks']:
         return
@@ -26,9 +60,9 @@ def subnet(row):
     return {
         "subnet": ip.with_prefixlen,
         "pools": [
-          {
-              "pool":  str(ip[poolstart]) + "-" + str(ip[pow(2, (32-ip.prefixlen))-6])
-          }
+            {
+                "pool": str(ip[poolstart]) + "-" + str(ip[pow(2, (32 - ip.prefixlen)) - 6])
+            }
         ],
         "relay": {
             "ip-address": str(ip[1])
@@ -41,29 +75,24 @@ def subnet(row):
         ]
     }
 
-predatafile = pathlib.Path(os.path.dirname(__file__), 'pre-data.csv')
+
+#predatafile = pathlib.Path(os.path.dirname(__file__), 'pre-data.csv')
 configfile = pathlib.Path(os.path.dirname(__file__), 'full-config.yaml')
-with open(configfile, 'r') as c:
-    main_list = yaml.safe_load(c)
-    for main_item in main_list:
-        for main_key, main_value in main_item.items():
-            print('Generating config for main IS with key ' + main_key)
-            main_name = main_key
-            for second_item in main_value:
-                for sec_key, sec_value in second_item.items():
-                    sec_name = sec_key
-                    ip_value = sec_value['ip']
-                    vlan_value = sec_value['vlan']
-                    print('main: ' + main_name + ' sec: ' + sec_name + ' ip: ' + ip_value + ' vlan: ' + str(vlan_value))
 datafile = pathlib.Path(os.path.dirname(__file__), 'data.csv')
-if predatafile.exists() and predatafile.is_file():
+#if predatafile.exists() and predatafile.is_file():
     # Pre-data file exists. Intention is to generate a data file.
-    pre = predatafile.read_bytes()
-    prereader = csv.DictReader(io.StringIO(pre.decode()), delimiter=',', quotechar='|')
-    with open(datafile, 'wb+') as f:
-        print('hest')
+#    pre = predatafile.read_bytes()
+#    prereader = csv.DictReader(io.StringIO(pre.decode()), delimiter=',', quotechar='|')
+#    with open(datafile, 'wb+') as f:
+#        print('hest')
+#else:
+#    print('No pre-data.csv file found')
+if not configfile.exists() or not configfile.is_file():
+    raise FileNotFoundError(configfile)
 else:
-    print('No pre-data.csv file found')
+    config_dict = read_yaml_as_dict(configfile)
+    post_config = map_pre_to_post_config(config_dict)
+
 
 if not datafile.exists() or not datafile.is_file():
     # netbox = 'https://netbox.minserver.dk/ipam/prefixes/?status=1&parent=&family=&q=&vrf=npflan&mask_length=&export'
