@@ -6,107 +6,153 @@ import os
 import pathlib
 import yaml
 
-indexes = range(1, 9)
-offsets = [1, 2, 3, 4, 5, 6, 7, 9]
-
-poolstart = 11
-
-std_incr = 10
-vrf_incr = std_incr
-ip_c_incr = std_incr
-vlan_incr = std_incr
-
-data_file_name = 'data.csv'
-full_config_name = 'full-config.yaml'
-
-vrf_descs_in_order = [
-    'wireless-ap-mgmt',
-    'it-netnisser',
-    'STAB',
-    'IP Telefoni',
-    'Beredskabet',
-    'hotspot',
-    'Video',
-    'Skejser'
-]
-
-
-def index_check(index):
-    print('index: ' + str(index))
-    return indexes.index(index)
-
-
-def vrf(index):
-    index_check(index)
-    return 'VRF' + str((offsets[index - 1] * vrf_incr))
-
-
-def ip_network(index, ipaddr):
-    index_check(index)
-    parts = ipaddr.exploded.split('.')
-    if int(parts[0]) != 10:
-        raise ValueError('Unexpected value: ' + parts[0])
-    # Increment part C
-    parts[2] = str(int(parts[2]) + (offsets[index - 1] * ip_c_incr))
-    return ipaddress.IPv4Network('.'.join(parts) + '/24')
-
-
-def class_b_part(ipaddr: ipaddress.IPv4Address):
-    parts = ipaddr.exploded
-    return parts[1]
-
-
-def vlan(index, vlan_offset):
-    index_check(index)
-    return vlan_offset + offsets[index - 1] * vlan_incr
-
-
-def vrf_desc(index):
-    index_check(index)
-    return vrf_descs_in_order[index - 1]
-
 
 class ConfigRow:
-    def __init__(self, main_name, sec_name, ip_value, vlan_value):
+    def __init__(
+            self,
+            main_name,
+            sec_name,
+            ip_value,
+            vlan_value,
+            offsets,
+            vrf_incr,
+            ip_c_incr,
+            vlan_incr,
+            cidr_subnet
+    ):
         self.main_name = main_name
         self.sec_name = sec_name
         self.ip_value = ip_value
         self.vlan_value = vlan_value
+        self.offsets = offsets
+        self.vrf_incr = vrf_incr
+        self.ip_c_incr = ip_c_incr
+        self.vlan_incr = vlan_incr
+        self.cidr_subnet = cidr_subnet
+        self.indexes = range(1, 9)
+
+    def network(self, value):
+        try:
+            return str(ipaddress.IPv4Network(value, strict=False))
+        except ValueError:
+            return ipaddress.IPv4Address(value).exploded + '/' + str(self.cidr_subnet)
+
+    def index_check(self, index):
+        return self.indexes.index(index)
+
+    def vrf(self, index):
+        self.index_check(index)
+        return 'VRF' + str((self.offsets[index - 1] * self.vrf_incr))
+
+    def ip_network(self, index, ip):
+        self.index_check(index)
+        parts = ip.split('.')
+        if int(parts[0]) != 10:
+            raise ValueError('Unexpected value: ' + parts[0])
+        # Increment part C
+
+        parts[2] = str(int(parts[2]) + (self.offsets[index - 1] * self.ip_c_incr))
+        return self.network('.'.join(parts))
+
+    def class_b_part(self, ipaddr: ipaddress.IPv4Address):
+        parts = ipaddr.exploded
+        return parts[1]
+
+    def vlan(self, index, vlan_offset):
+        self.index_check(index)
+        return vlan_offset + self.offsets[index - 1] * self.vlan_incr
+
+    def vrf_desc(self, index): pass
 
 
-def read_yaml_as_dict(configfile):
+class WiredConfigRow(ConfigRow):
+    def __init__(self, main_name, sec_name, ip_value, vlan_value):
+        super().__init__(
+            main_name,
+            sec_name,
+            ip_value,
+            vlan_value,
+            [1, 2, 3, 4, 5, 6, 7, 9],
+            10,
+            10,
+            10,
+            24
+        )
+        self.vrf_descs_in_order = [
+            'wireless-ap-mgmt',
+            'it-netnisser',
+            'STAB',
+            'IP Telefoni',
+            'Beredskabet',
+            'hotspot',
+            'Video',
+            'Skejser'
+        ]
+
+    def vrf_desc(self, index):
+        self.index_check(index)
+        return self.vrf_descs_in_order[index - 1]
+
+
+class WirelessConfigRow(ConfigRow):
+    def __init__(self, main_name, sec_name, ip_value, vlan_value):
+        super().__init__(
+            main_name,
+            sec_name,
+            ip_value,
+            vlan_value,
+            range(0, 8),
+            10,
+            10,
+            10,
+            20
+        )
+
+    def vrf_desc(self, index):
+        self.index_check(index)
+        return 'wifi-client-range'
+
+
+wired_config_name = 'wired-config.yaml'
+wifi_config_name = 'wifi-config.yaml'
+config_file_names = [wired_config_name, wifi_config_name]
+data_file_name = 'data.csv'
+poolstart = 11
+
+
+def read_yaml_as_dict(configfile, wireless=False):
     result = []
     with open(configfile, 'r') as c:
         main_list = yaml.safe_load(c)
         for main_item in main_list:
             for main_key, main_value in main_item.items():
-                print('Generating config for main IS with key ' + main_key)
                 main_name = main_key
                 for second_item in main_value:
                     for sec_key, sec_value in second_item.items():
                         sec_name = sec_key
                         ip_value = sec_value['ip']
                         vlan_value = sec_value['vlan']
-                        print('main: ' + main_name + ' sec: ' + sec_name + ' ip: ' + ip_value + ' vlan: ' + str(
-                            vlan_value))
-                        result.append(ConfigRow(main_name, sec_name, ip_value, vlan_value))
+                        result.append(
+                            WirelessConfigRow(main_name, sec_name, ip_value, vlan_value)
+                            if wireless else
+                            WiredConfigRow(main_name, sec_name, ip_value, vlan_value)
+                        )
     return result
 
 
 def map_pre_to_post_config(config_rows):
     result = []
     for input_row in config_rows:
-        base_ip_addr = ipaddress.IPv4Address(input_row.ip_value)
-        for index in indexes:
+        for index in input_row.indexes:
             # prefix, vrf, tenant, site, vlan_group, vlan, status, role, is_pool, description
             # 10.0.0.0/30,NPFLAN,,npflan,npflan-core1,301,Active,Firewall Net,,AVATAR Inside
             result.append({
-                'prefix': ip_network(index, base_ip_addr),
-                'vrf': vrf(index),
+                'prefix': input_row.ip_network(index, input_row.ip_value),
+                'vrf': input_row.vrf(index),
                 'tenant': 'SL2022',
                 'site': 'sl2022',
-                'vlan_group': vrf_desc(index),
-                'vlan': vlan(index, input_row.vlan_value),
+                'vlan_group': input_row.vrf_desc(index),
+                'vlan': input_row.vlan(index, input_row.vlan_value),
                 'status': 'Active',
                 'role': 'n/a',
                 'is_pool': '',
@@ -115,21 +161,21 @@ def map_pre_to_post_config(config_rows):
     return result
 
 
-def write_data_file(input_dict, outputfilename):
-    with open(outputfilename, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=input_dict[0].keys())
-        writer.writeheader()
+def write_data_file(input_dict, outputfilename, append=False):
+    with open(outputfilename, 'a' if append else 'w') as csvfile:
+        writer = csv.DictWriter(
+            csvfile,
+            fieldnames=input_dict[0].keys(),
+            dialect=csv.unix_dialect
+        )
+        if not append:
+            writer.writeheader()
         writer.writerows(input_dict)
         csvfile.flush()
         csvfile.close()
 
 
 def subnet(row):
-    if row['role'].casefold() not in ['access', 'wireless', 'management  netværk', 'management netværk', 'cctv',
-                                      'management access points', 'environment']:
-        return
-    if row['description'].casefold() in ['wireless networks']:
-        return
     ip = ipaddress.IPv4Network(row['prefix'])
 
     if ip.prefixlen > 24:
@@ -153,22 +199,22 @@ def subnet(row):
     }
 
 
-configfile = pathlib.Path(os.path.dirname(__file__), full_config_name)
-datafile = pathlib.Path(os.path.dirname(__file__), data_file_name)
-if not configfile.exists() or not configfile.is_file():
-    raise FileNotFoundError(configfile)
-else:
-    config_dict = read_yaml_as_dict(configfile)
-    post_config = map_pre_to_post_config(config_dict)
-    write_data_file(post_config, data_file_name)
+for i, config_file_name in enumerate(config_file_names):
+    config_file_name = pathlib.Path(os.path.dirname(__file__), config_file_name)
+    if not config_file_name.exists() or not config_file_name.is_file():
+        raise FileNotFoundError(config_file_name)
+    else:
+        config_dict = read_yaml_as_dict(config_file_name)
+        post_config = map_pre_to_post_config(config_dict)
+        write_data_file(post_config, data_file_name, (i > 0))
 
+datafile = pathlib.Path(os.path.dirname(__file__), data_file_name)
 if not datafile.exists() or not datafile.is_file():
-    raise Exception('Expected a CSV file to be found at ' + datafile.name + '. No such file found.')
+    raise FileNotFoundError(data_file_name)
 else:
     data = datafile.read_bytes()
 
-reader = csv.DictReader(io.StringIO(data.decode()),
-                        delimiter=',', quotechar='|')
+reader = csv.DictReader(io.StringIO(data.decode()), delimiter=',', dialect=csv.unix_dialect)
 print('"subnet4":')
 print(
     json.dumps(
