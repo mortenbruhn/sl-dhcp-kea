@@ -1,11 +1,9 @@
 import csv
-import ipaddress
-import sys
-import os
-import urllib.request
 import io
-import pathlib
+import ipaddress
 import json
+import os
+import pathlib
 
 
 def subnet(row):
@@ -44,10 +42,11 @@ def subnet(row):
 
 datafile = pathlib.Path(os.path.dirname(__file__), 'data.csv')
 if not datafile.exists() or not datafile.is_file():
-    netbox = 'https://netbox.minserver.dk/ipam/prefixes/?status=1&parent=&family=&q=&vrf=npflan&mask_length=&export'
-    data = urllib.request.urlopen(netbox).read()
-    with open(datafile, 'wb+') as f:
-        f.write(data)
+    # netbox = 'https://netbox.minserver.dk/ipam/prefixes/?status=1&parent=&family=&q=&vrf=npflan&mask_length=&export'
+    # data = urllib.request.urlopen(netbox).read()
+    # with open(datafile, 'wb+') as f:
+    #     f.write(data)
+    raise Exception("Expected a CSV file to be found at " + datafile.name + ". No such file found.")
 else:
     data = datafile.read_bytes()
 
