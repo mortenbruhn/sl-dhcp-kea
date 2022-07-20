@@ -1,0 +1,2 @@
+prefix,vrf,tenant,site,vlan_group,vlan,status,role,is_pool,description
+10.0.0.0/30,VRF10,,sl2022,wireless-ap-mgmt,110,Active,wireless,,wireless-ap-mgmt IS01
