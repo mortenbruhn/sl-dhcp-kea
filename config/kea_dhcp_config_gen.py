@@ -30,6 +30,16 @@ class ConfigRow:
         self.vlan_incr = vlan_incr
         self.cidr_subnet = cidr_subnet
         self.indexes = range(1, 9)
+        self.vrf_desc_dict = {
+            'VRF10': 'wireless-ap-mgmt',
+            'VRF20': 'it-netnisser',
+            'VRF30': 'STAB',
+            'VRF40': 'IP Telefoni',
+            'VRF50': 'Beredskabet',
+            'VRF60': 'hotspot',
+            'VRF70': 'Video',
+            'VRF90': 'Skejser'
+        }
 
     def network(self, value):
         try:
@@ -39,10 +49,6 @@ class ConfigRow:
 
     def index_check(self, index):
         return self.indexes.index(index)
-
-    def vrf(self, index):
-        self.index_check(index)
-        return 'VRF' + str((self.offsets[index - 1] * self.vrf_incr))
 
     def ip_network(self, index, ip):
         self.index_check(index)
@@ -62,7 +68,8 @@ class ConfigRow:
         self.index_check(index)
         return vlan_offset + self.offsets[index - 1] * self.vlan_incr
 
-    def vrf_desc(self, index): pass
+    def vrf_desc(self, vfr): pass
+    def vrf_id(self, index): pass
 
 
 class WiredConfigRow(ConfigRow):
@@ -78,24 +85,17 @@ class WiredConfigRow(ConfigRow):
             10,
             24
         )
-        self.vrf_descs_in_order = [
-            'wireless-ap-mgmt',
-            'it-netnisser',
-            'STAB',
-            'IP Telefoni',
-            'Beredskabet',
-            'hotspot',
-            'Video',
-            'Skejser'
-        ]
 
-    def vrf_desc(self, index):
+    def vrf_desc(self, vfr):
+        return self.vrf_desc_dict[vfr]
+
+    def vrf_id(self, index):
         self.index_check(index)
-        return self.vrf_descs_in_order[index - 1]
+        return 'VRF' + str((self.offsets[index - 1] * self.vrf_incr))
 
 
 class WirelessConfigRow(ConfigRow):
-    def __init__(self, main_name, sec_name, ip_value, vlan_value):
+    def __init__(self, main_name, sec_name, ip_value, vlan_value, vrf='VRF60'):
         super().__init__(
             main_name,
             sec_name,
@@ -107,10 +107,13 @@ class WirelessConfigRow(ConfigRow):
             10,
             20
         )
+        self.vrf = vrf
 
-    def vrf_desc(self, index):
-        self.index_check(index)
-        return 'wifi-client-range'
+    def vrf_desc(self, vrf):
+        return self.vrf_desc_dict[self.vrf]
+
+    def vrf_id(self, index):
+        return self.vrf
 
 
 wired_config_name = 'wired-config.yaml'
@@ -133,7 +136,7 @@ def read_yaml_as_dict(configfile, wireless=False):
                         ip_value = sec_value['ip']
                         vlan_value = sec_value['vlan']
                         result.append(
-                            WirelessConfigRow(main_name, sec_name, ip_value, vlan_value)
+                            WirelessConfigRow(main_name, sec_name, ip_value, vlan_value, sec_value['vrf'])
                             if wireless else
                             WiredConfigRow(main_name, sec_name, ip_value, vlan_value)
                         )
@@ -148,10 +151,10 @@ def map_pre_to_post_config(config_rows):
             # 10.0.0.0/30,NPFLAN,,npflan,npflan-core1,301,Active,Firewall Net,,AVATAR Inside
             result.append({
                 'prefix': input_row.ip_network(index, input_row.ip_value),
-                'vrf': input_row.vrf(index),
+                'vrf': input_row.vrf_id(index),
                 'tenant': 'SL2022',
                 'site': 'sl2022',
-                'vlan_group': input_row.vrf_desc(index),
+                'vlan_group': input_row.vrf_desc(input_row.vrf_id(index)),
                 'vlan': input_row.vlan(index, input_row.vlan_value),
                 'status': 'Active',
                 'role': 'n/a',
@@ -204,7 +207,7 @@ for i, config_file_name in enumerate(config_file_names):
     if not config_file_name.exists() or not config_file_name.is_file():
         raise FileNotFoundError(config_file_name)
     else:
-        config_dict = read_yaml_as_dict(config_file_name)
+        config_dict = read_yaml_as_dict(config_file_name, wireless=(i > 0))
         post_config = map_pre_to_post_config(config_dict)
         write_data_file(post_config, data_file_name, (i > 0))
 
