@@ -18,7 +18,8 @@ class ConfigRow:
             vrf_incr,
             ip_c_incr,
             vlan_incr,
-            cidr_subnet
+            cidr_subnet,
+            indexes
     ):
         self.main_name = main_name
         self.sec_name = sec_name
@@ -29,7 +30,7 @@ class ConfigRow:
         self.ip_c_incr = ip_c_incr
         self.vlan_incr = vlan_incr
         self.cidr_subnet = cidr_subnet
-        self.indexes = range(1, 9)
+        self.indexes = indexes
         self.vrf_desc_dict = {
             'VRF10': 'wireless-ap-mgmt',
             'VRF20': 'it-netnisser',
@@ -83,7 +84,8 @@ class WiredConfigRow(ConfigRow):
             10,
             10,
             10,
-            24
+            24,
+            range(1, 9)
         )
 
     def vrf_desc(self, vfr):
@@ -104,8 +106,9 @@ class WirelessConfigRow(ConfigRow):
             range(0, 8),
             10,
             10,
-            10,
-            20
+            0,
+            20,
+            [0]
         )
         self.vrf = vrf
 
