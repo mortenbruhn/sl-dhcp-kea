@@ -6,26 +6,44 @@ import os
 import pathlib
 import yaml
 
+indexes = range(1, 9)
+offsets = [1, 2, 3, 4, 5, 6, 7, 9]
 
-indexes = range(1,10)
+std_incr = 10
+vrf_incr = std_incr
+ip_c_incr = std_incr
+vlan_incr = std_incr
+
+vrf_descs_in_order = [
+    'wireless-ap-mgmt',
+    'it-netnisser',
+    'STAB',
+    'IP Telefoni',
+    'Beredskabet',
+    'hotspot',
+    'Video',
+    'Skejser'
+]
 
 
 def index_check(index):
+    print('index: ' + str(index))
     return indexes.index(index)
 
 
 def vrf(index):
     index_check(index)
-    return 'VRF' + (index * 10)
+    return 'VRF' + str((offsets[index - 1] * vrf_incr))
 
 
 def ip_network(index, ipaddr):
     index_check(index)
-    parts = ipaddr.exploded
-    assert parts[0] == 10
+    parts = ipaddr.exploded.split('.')
+    if int(parts[0]) != 10:
+        raise ValueError('Unexpected value: ' + parts[0])
     # Increment part C
-    parts[2] = parts[2] + (index * 10)
-    return ipaddress.IPv4Network(parts + '/24')
+    parts[2] = str(int(parts[2]) + (offsets[index - 1] * ip_c_incr))
+    return ipaddress.IPv4Network('.'.join(parts) + '/24')
 
 
 def class_b_part(ipaddr: ipaddress.IPv4Address):
@@ -35,19 +53,7 @@ def class_b_part(ipaddr: ipaddress.IPv4Address):
 
 def vlan(index, vlan_offset):
     index_check(index)
-    return vlan_offset + index * 10
-
-
-vrf_descs_in_order = {
-    'wireless-ap-mgmt',
-    'it-netnisser',
-    'STAB',
-    'IP Telefoni',
-    'Beredskabet',
-    'hotspot',
-    'Video',
-    'Skejser'
-}
+    return vlan_offset + offsets[index - 1] * vlan_incr
 
 
 def vrf_desc(index):
@@ -64,6 +70,7 @@ class ConfigRow:
 
 
 def read_yaml_as_dict(configfile):
+    result = []
     with open(configfile, 'r') as c:
         main_list = yaml.safe_load(c)
         for main_item in main_list:
@@ -77,16 +84,18 @@ def read_yaml_as_dict(configfile):
                         vlan_value = sec_value['vlan']
                         print('main: ' + main_name + ' sec: ' + sec_name + ' ip: ' + ip_value + ' vlan: ' + str(
                             vlan_value))
-                        yield ConfigRow(main_name, sec_name, ip_value, vlan_value)
+                        result.append(ConfigRow(main_name, sec_name, ip_value, vlan_value))
+    return result
 
 
 def map_pre_to_post_config(config_rows):
+    result = []
     for input_row in config_rows:
         base_ip_addr = ipaddress.IPv4Address(input_row.ip_value)
         for index in indexes:
             # prefix, vrf, tenant, site, vlan_group, vlan, status, role, is_pool, description
             # 10.0.0.0/30,NPFLAN,,npflan,npflan-core1,301,Active,Firewall Net,,AVATAR Inside
-            yield {
+            result.append({
                 'prefix': ip_network(index, base_ip_addr),
                 'vrf': vrf(index),
                 'tenant': 'SL2022',
@@ -97,14 +106,16 @@ def map_pre_to_post_config(config_rows):
                 'role': 'n/a',
                 'is_pool': '',
                 'description': input_row.main_name + ' - ' + input_row.sec_name
-            }
+            })
+    return result
+
 
 def write_data_file(input_dict, outputfilename):
     with open(outputfilename, 'w') as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=input_dict.keys())
-
+        writer = csv.DictWriter(csvfile, fieldnames=input_dict[0].keys())
         writer.writeheader()
         writer.writerows(input_dict)
+
 
 def subnet(row):
     if row['role'].casefold() not in ['access', 'wireless', 'management  netværk', 'management netværk', 'cctv',
@@ -142,23 +153,23 @@ def subnet(row):
     }
 
 
-#predatafile = pathlib.Path(os.path.dirname(__file__), 'pre-data.csv')
+# predatafile = pathlib.Path(os.path.dirname(__file__), 'pre-data.csv')
 configfile = pathlib.Path(os.path.dirname(__file__), 'full-config.yaml')
 datafile = pathlib.Path(os.path.dirname(__file__), 'data.csv')
-#if predatafile.exists() and predatafile.is_file():
-    # Pre-data file exists. Intention is to generate a data file.
+# if predatafile.exists() and predatafile.is_file():
+# Pre-data file exists. Intention is to generate a data file.
 #    pre = predatafile.read_bytes()
 #    prereader = csv.DictReader(io.StringIO(pre.decode()), delimiter=',', quotechar='|')
 #    with open(datafile, 'wb+') as f:
 #        print('hest')
-#else:
+# else:
 #    print('No pre-data.csv file found')
 if not configfile.exists() or not configfile.is_file():
     raise FileNotFoundError(configfile)
 else:
     config_dict = read_yaml_as_dict(configfile)
     post_config = map_pre_to_post_config(config_dict)
-
+    write_data_file(post_config, 'data.csv')
 
 if not datafile.exists() or not datafile.is_file():
     # netbox = 'https://netbox.minserver.dk/ipam/prefixes/?status=1&parent=&family=&q=&vrf=npflan&mask_length=&export'
