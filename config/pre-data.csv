@@ -1,2 +1,3 @@
-prefix,vrf,tenant,site,vlan_group,vlan,status,role,is_pool,description
-10.0.0.0/30,VRF10,,sl2022,wireless-ap-mgmt,110,Active,wireless,,wireless-ap-mgmt IS01
+main_is_name,sub_is_name,ip_start,vlan_offset
+IS01,IS01,10.1.10.0,100
+IS01,IS03,10.3.10.0,300
