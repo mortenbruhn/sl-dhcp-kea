@@ -7,8 +7,55 @@ import pathlib
 import yaml
 
 
-class ConfigRow():
+indexes = range(1,10)
 
+
+def index_check(index):
+    return indexes.index(index)
+
+
+def vrf(index):
+    index_check(index)
+    return 'VRF' + (index * 10)
+
+
+def ip_network(index, ipaddr):
+    index_check(index)
+    parts = ipaddr.exploded
+    assert parts[0] == 10
+    # Increment part C
+    parts[2] = parts[2] + (index * 10)
+    return ipaddress.IPv4Network(parts + '/24')
+
+
+def class_b_part(ipaddr: ipaddress.IPv4Address):
+    parts = ipaddr.exploded
+    return parts[1]
+
+
+def vlan(index, vlan_offset):
+    index_check(index)
+    return vlan_offset + index * 10
+
+
+vrf_descs_in_order = {
+    'wireless-ap-mgmt',
+    'it-netnisser',
+    'STAB',
+    'IP Telefoni',
+    'Beredskabet',
+    'hotspot',
+    'Video',
+    'Skejser'
+}
+
+
+def vrf_desc(index):
+    index_check(index)
+    return vrf_descs_in_order[index - 1]
+
+
+class ConfigRow:
     def __init__(self, main_name, sec_name, ip_value, vlan_value):
         self.main_name = main_name
         self.sec_name = sec_name
@@ -35,10 +82,29 @@ def read_yaml_as_dict(configfile):
 
 def map_pre_to_post_config(config_rows):
     for input_row in config_rows:
-        # prefix, vrf, tenant, site, vlan_group, vlan, status, role, is_pool, description
-        # 10.0.0.0/30,NPFLAN,,npflan,npflan-core1,301,Active,Firewall Net,,AVATAR Inside
-        ipnet = ipaddress.ip_address(input_row.ip_value + "/24")
+        base_ip_addr = ipaddress.IPv4Address(input_row.ip_value)
+        for index in indexes:
+            # prefix, vrf, tenant, site, vlan_group, vlan, status, role, is_pool, description
+            # 10.0.0.0/30,NPFLAN,,npflan,npflan-core1,301,Active,Firewall Net,,AVATAR Inside
+            yield {
+                'prefix': ip_network(index, base_ip_addr),
+                'vrf': vrf(index),
+                'tenant': 'SL2022',
+                'site': 'sl2022',
+                'vlan_group': vrf_desc(index),
+                'vlan': vlan(index, input_row.vlan_value),
+                'status': 'Active',
+                'role': 'n/a',
+                'is_pool': '',
+                'description': input_row.main_name + ' - ' + input_row.sec_name
+            }
 
+def write_data_file(input_dict, outputfilename):
+    with open(outputfilename, 'w') as csvfile:
+        writer = csv.DictWriter(csvfile, fieldnames=input_dict.keys())
+
+        writer.writeheader()
+        writer.writerows(input_dict)
 
 def subnet(row):
     if row['role'].casefold() not in ['access', 'wireless', 'management  netværk', 'management netværk', 'cctv',
