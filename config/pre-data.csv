@@ -1,3 +1,0 @@
-main_is_name,sub_is_name,ip_start,vlan_offset
-IS01,IS01,10.1.10.0,100
-IS01,IS03,10.3.10.0,300
