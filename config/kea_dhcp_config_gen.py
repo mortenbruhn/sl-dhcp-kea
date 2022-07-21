@@ -125,7 +125,8 @@ wired_config_name = 'wired-config.yaml'
 wifi_config_name = 'wifi-config.yaml'
 config_file_names = [wired_config_name, wifi_config_name]
 data_file_name = 'data.csv'
-poolstart = 11
+default_pool_start = 16
+wlan_controller_ip = '10.255.10.10'
 
 
 def read_yaml_as_dict(configfile, wireless=False):
@@ -183,16 +184,39 @@ def write_data_file(input_dict, outputfilename, append=False):
         csvfile.close()
 
 
+def hex_encode_part(part: int):
+    return '{0:0{1}x}'.format(part, 2)
+
+
+def hex_encode_ip(ip):
+    result = ''
+    for part in ip.split('.'):
+        result += hex_encode_part(int(part))
+    return result
+
+
+def hex_encode_option_43(ips: list):
+    no_of_ips = len(ips)
+    prefix = '0xf1' + hex_encode_part((no_of_ips * 4))
+    ip_encoded_suffix = ''
+    for ip in ips:
+        ip_encoded_suffix += hex_encode_ip(ip)
+    return prefix + ip_encoded_suffix
+
+
 def subnet(row):
     ip = ipaddress.IPv4Network(row['prefix'])
 
     if ip.prefixlen > 24:
         return
+
+    pool_start = default_pool_start
+
     return {
         "subnet": ip.with_prefixlen,
         "pools": [
             {
-                "pool": str(ip[poolstart]) + "-" + str(ip[pow(2, (32 - ip.prefixlen)) - 6])
+                "pool": str(ip[pool_start]) + "-" + str(ip[pow(2, (32 - ip.prefixlen)) - 6])
             }
         ],
         "relay": {
@@ -202,6 +226,11 @@ def subnet(row):
             {
                 "name": "routers",
                 "data": str(ip[1])
+            },
+            {
+                "name": "vendor-encapsulated-options",
+                "code": 43,
+                "data": "hex " + hex_encode_option_43([wlan_controller_ip])
             }
         ]
     }
