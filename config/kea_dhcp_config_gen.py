@@ -43,10 +43,12 @@ class ConfigRow:
         }
 
     def network(self, value):
-        try:
-            return str(ipaddress.IPv4Network(value, strict=False))
-        except ValueError:
-            return ipaddress.IPv4Address(value).exploded + '/' + str(self.cidr_subnet)
+        return str(ipaddress.IPv4Network(
+            value + ('/' +
+                     str(self.cidr_subnet)
+                     if not (value.__contains__('/')) else
+                     ""
+                     ), strict=False))
 
     def index_check(self, index):
         return self.indexes.index(index)
