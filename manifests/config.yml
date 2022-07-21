@@ -12,7 +12,7 @@ data:
           "option-data": [
             {
               "name": "domain-name-servers",
-              "data": "1.1.1.1, 8.8.8.8, 8.8.4.4"
+              "data": "1.1.1.1\\,8.8.8.8,\\8.8.4.4"
             }
           ],
           "valid-lifetime": 10800,
