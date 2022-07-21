@@ -204,6 +204,23 @@ def hex_encode_option_43(ips: list):
     return prefix + ip_encoded_suffix
 
 
+def getoptions(row, ip):
+    result = [
+        {
+            "name": "routers",
+            "data": str(ip[1])
+        }
+    ]
+    if row['vlan_group'] == 'wireless-ap-mgmt':
+        result.append({
+            "name": "vendor-encapsulated-options",
+            "code": 43,
+            "data": "hex " + hex_encode_option_43([wlan_controller_ip])
+        }
+    )
+    return result
+
+
 def subnet(row):
     ip = ipaddress.IPv4Network(row['prefix'])
 
@@ -222,17 +239,7 @@ def subnet(row):
         "relay": {
             "ip-address": str(ip[1])
         },
-        "option-data": [
-            {
-                "name": "routers",
-                "data": str(ip[1])
-            },
-            {
-                "name": "vendor-encapsulated-options",
-                "code": 43,
-                "data": "hex " + hex_encode_option_43([wlan_controller_ip])
-            }
-        ]
+        "option-data": getoptions(row, ip)
     }
 
 
