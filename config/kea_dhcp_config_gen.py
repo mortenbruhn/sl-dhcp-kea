@@ -214,7 +214,7 @@ def getoptions(row, ip):
     if row['vlan_group'] == 'wireless-ap-mgmt':
         result.append({
             "space": "custom-cisco-ap-space",
-            "csv-data": False,
+            "csv-format": False,
             "name": "vendor-encapsulated-options",
             "code": 43,
             "data": hex_encode_option_43([wlan_controller_ip])
