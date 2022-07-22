@@ -64,3 +64,8 @@
       ip: 10.202.112.0/20
       vlan: 3017
       vrf: VRF30
+- VLC DC1 NetNisse:
+  - s0:
+      ip: 10.220.0.0/20
+      vlan: 3020
+      vrf: VRF20
