@@ -110,7 +110,7 @@ class WirelessConfigRow(ConfigRow):
             10,
             0,
             20,
-            [0]
+            range(1, 2)
         )
         self.vrf = vrf
 
