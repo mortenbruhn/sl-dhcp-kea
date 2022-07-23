@@ -5,7 +5,7 @@ Kea DHCP server
 
 ```bash
 mv config/data.csv config/data.csv.bak # force download
-python3 config/isc_dhcp_config_gen.py > subnet.conf
+python3 config/kea_dhcp_config_gen.py > subnet.conf
 kubectl create configmap keasubnet -n dhcp --from-file=subnet.conf --dry-run=true -o yaml > subnet.yaml
 ```
 
