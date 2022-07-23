@@ -69,3 +69,8 @@
       ip: 10.220.0.0/20
       vlan: 3020
       vrf: VRF20
+- VLC DC1 Skejser:
+  - s0:
+      ip: 10.204.0.0/23
+      vlan: 3090
+      vrf: VRF90
